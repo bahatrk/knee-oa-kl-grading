@@ -52,10 +52,10 @@ cells = [
          "files.download('/content/cpu_latency_extra.csv'); files.download('/content/gecikme_ve_deploy.zip')"),
     md("## 5 · Teslim klasörü (en son, rapor son hâlini aldıktan sonra)\n\n"
        "Rapor dosyalarını (`YZProje_Rapor_*.docx/.pdf`) Drive'da `YZProje/report/` klasörüne koyun; sonra bu hücreyi çalıştırın. "
-       "Çıktı: `22070090071_BahaTurk_YZProje.zip` (README'deki SHA256 otomatik doldurulur)."),
+       "Çıktı: `220709071_BahaTurk_YZProje.zip` (README'deki SHA256 otomatik doldurulur)."),
     code("!python tools/make_submission.py --project {C.PROJECT_ROOT} --out /content\n"
          "from google.colab import files\n"
-         "files.download('/content/22070090071_BahaTurk_YZProje.zip')"),
+         "files.download('/content/220709071_BahaTurk_YZProje.zip')"),
 ]
 nb = nbf.v4.new_notebook(cells=cells); nb.metadata = META
 nbf.write(nb, ROOT / "15_gecikme_ve_teslim_paketi.ipynb"); print("15 ok")

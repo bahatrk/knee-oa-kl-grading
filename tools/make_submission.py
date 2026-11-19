@@ -1,10 +1,10 @@
-"""Teslim klasörünü kurar: 22070090071_BahaTurk_YZProje (ve zip).
+"""Teslim klasörünü kurar: 220709071_BahaTurk_YZProje (ve zip).
   python tools/make_submission.py --project <YZProje klasörü> --out /content
 Ham veri ve büyük/yeniden üretilebilir dosyalar dahil edilmez; float32 model.pt dahil edilmez (fp16 kopya girer)."""
 import argparse, json, shutil, zipfile
 from pathlib import Path
 
-NAME = "22070090071_BahaTurk_YZProje"
+NAME = "220709071_BahaTurk_YZProje"
 
 
 def main(project: Path, out: Path):

@@ -1,6 +1,6 @@
 # VS13 · Diz Röntgenlerinde Osteoartrit Şiddeti (KL 0–4) Sınıflandırma
 
-MBM6 453 Yapay Zekâya Giriş dersi projesi · Baha Türk · 22070090071
+MBM6 453 Yapay Zekâya Giriş dersi projesi · Baha Türk · 220709071
 
 Tüm sayılar `results.csv` ve `outputs/final/` içindeki CSV dosyalarından gelir; rapor bu dosyalardan üretilmiştir.
 
