@@ -1,7 +1,7 @@
 # VS13 - Diz osteoartriti KL derecelendirme projesi
-# Ortam: Google Colab (Python 3.13). Sürümler, eğitim/değerlendirme oturumlarının `pip freeze` kaydından alınmıştır
-# (outputs/env/pip_freeze.txt). Eğitim T4 GPU üzerinde, aynı torch/torchvision ana sürümüyle yapılmıştır;
-# predict.py yalnızca CPU gerektirir (CPU için: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu).
+# Ortam: Google Colab, Python 3.13.18. Sürümler, oturumların `pip freeze` kayıtlarıyla doğrulanmıştır (docs/ENVIRONMENT.md).
+# Eğitim (T4 GPU) torch 2.11.0+cu130 / torchvision 0.26.0+cu130 ile yapıldı; aşağıdaki sürümler eğitimde kullanılanlardır.
+# predict.py yalnızca CPU gerektirir (CPU için: pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cpu).
 
 torch==2.11.0
 torchvision==0.26.0
