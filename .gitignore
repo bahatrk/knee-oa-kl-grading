@@ -1,0 +1,25 @@
+# --- Python ---
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+
+# --- Veri ve ürettiği çıktılar: depoya girmez (ham veri yeniden dağıtılmaz, çıktılar yeniden üretilir) ---
+data/
+outputs/
+*.zip
+*.tar.gz
+
+# --- Model ağırlıkları: GitHub 100 MB sınırı; teslimde zip içinde / Release eki olarak verilir ---
+*.pt
+*.pth
+*.npy
+*.npz
+
+# --- Rapor ikilileri (kaynak: report/ altındaki betikler) ---
+*.docx
+*.pdf
+
+# --- Yerel dosyalar ---
+.DS_Store
+.env
