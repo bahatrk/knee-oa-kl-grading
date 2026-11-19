@@ -55,40 +55,59 @@ def flowchart():
 
 # ---------------------------------------------------------------- mimari şema
 def architecture():
+    """Ayrıntılı blok şeması: gövde (stem + 4 aşama, çıktı boyutları) ve aşama 2-4'ten çıkan dallar."""
     p = C.OUTPUT_DIR / "original_architecture.csv"
     df = pd.read_csv(p) if p.exists() else pd.DataFrame(columns=["block", "type", "output", "params"])
-    fig, ax = plt.subplots(figsize=(11, 4.6)); ax.axis("off"); ax.set_xlim(0, 12); ax.set_ylim(0, 6)
+    fig, ax = plt.subplots(figsize=(11.5, 6.2)); ax.axis("off"); ax.set_xlim(0, 13); ax.set_ylim(0, 7.4)
+    NEW, STD, IO = "#f7e1d6", "#d9e6f7", "#eeeeee"
 
-    def box(x, y, w, h, t, fc="#d9e6f7"):
+    def prm(key):
+        m = df[df.block.astype(str) == key]
+        return f"{int(m.params.sum()):,}" if len(m) else "-"
+
+    def box(x, y, w, h, t, fc=STD):
         ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.08", fc=fc, ec=S.AXIS))
-        ax.text(x + w / 2, y + h / 2, t, ha="center", va="center", fontsize=7, color=S.INK)
+        ax.text(x + w / 2, y + h / 2, t, ha="center", va="center", fontsize=6.8, color=S.INK)
 
     def arr(a, b):
         ax.add_patch(FancyArrowPatch(a, b, arrowstyle="-|>", mutation_scale=8, color=S.INK_2))
 
-    def prm(prefix):
-        m = df[df.block.astype(str).str.startswith(prefix)]
-        return f"{int(m.params.sum()):,}" if len(m) else "-"
-
-    box(0.1, 2.6, 1.4, 0.9, "Giriş\n3×224×224", "#eeeeee"); box(1.8, 2.6, 1.6, 0.9, "A: görüntü başına\nstandardizasyon", "#f7e1d6")
-    arr((1.5, 3.05), (1.8, 3.05)); arr((3.4, 3.05), (3.8, 3.05))
-    box(3.8, 2.6, 2.0, 0.9, f"ConvNeXt-Tiny omurga\n(ImageNet)\n{prm('backbone'):>} par.", "#d9e6f7")
-    outs = [("aşama 2", 4.6, "192×28×28"), ("aşama 3", 2.9, "384×14×14"), ("aşama 4", 1.2, "768×7×7")]
-    stage_x = 6.3
-    for (nm, y, shp), i in zip(outs, range(3)):
-        arr((5.8, 3.05), (stage_x, y + 0.45))
-        box(stage_x, y, 1.9, 0.9, f"{nm}: {shp}\nC: satır dikkati\n{prm(f'row_attn[{i}]')} par.", "#f7e1d6")
-        box(stage_x + 2.2, y, 1.6, 0.9, f"B: ort.+maks.\nhavuz + LayerNorm\n{prm(f'pool+norm[{i}]')} par.", "#f7e1d6")
-        arr((stage_x + 1.9, y + 0.45), (stage_x + 2.2, y + 0.45)); arr((stage_x + 3.8, y + 0.45), (10.5, 3.05))
-    box(10.5, 2.6, 1.4, 0.9, f"Birleştir\n+ Dropout\n+ Linear\n{prm('head'):>} par.", "#d9e6f7")
-    ax.text(10.5, 1.9, "Çıktı: 5 sınıf (KL0–KL4)\nD: ordinal kayıp (eğitimde)", fontsize=7, color=S.INK_2)
-    ax.text(0.1, 0.3, "Turuncu: bu çalışmada eklenen bileşenler (A, B, C, D). Mavi: hazır ağırlıklar / standart katmanlar.", fontsize=7.5, color=S.INK_2)
-    _save(fig, "fig02_mimari", "Şekil 2. Özgün modelin blok şeması: katman türleri, çıktı boyutları ve parametre sayıları.")
+    ax.text(0.1, 7.1, "ConvNeXt-Tiny gövdesi (ImageNet ağırlıkları)", fontsize=8, color=S.INK_2, weight="bold")
+    # gövde (soldan sağa, tek sıra)
+    back = [("Giriş\n3×224×224\n(A: görüntü başına\nstandardizasyon)", IO, "", 1.7),
+            ("Stem\nConv 4×4, adım 4\n+ LayerNorm2d\n96×56×56", STD, "backbone.stem_0", 1.7),
+            ("Aşama 1\n3 ConvNeXt bloğu\n96×56×56", STD, "backbone.stages_0", 1.7),
+            ("Aşama 2\n3 blok (7×7 derinlik-\nbazlı konv.)\n192×28×28", STD, "backbone.stages_1", 1.9),
+            ("Aşama 3\n9 blok\n384×14×14", STD, "backbone.stages_2", 1.7),
+            ("Aşama 4\n3 blok\n768×7×7", STD, "backbone.stages_3", 1.7)]
+    x = 0.1; xs = []
+    for i, (t, fc, key, w) in enumerate(back):
+        box(x, 5.4, w, 1.4, t, fc); xs.append((x, w))
+        if i: arr((x - 0.18, 6.1), (x, 6.1))
+        x += w + 0.18
+    ax.add_patch(plt.Rectangle((0.5, 5.3), 0.01, 0.01, fc="none"))
+    # dallar: aşama 2, 3, 4 çıktısı -> satır dikkati (C) -> havuz (B) -> LayerNorm -> birleştirme
+    rows = [(4.0, "Aşama 2 çıktısı", "192×28×28", "row_attn[0]", "pool+norm[0]", 384),
+            (2.7, "Aşama 3 çıktısı", "384×14×14", "row_attn[1]", "pool+norm[1]", 768),
+            (1.4, "Aşama 4 çıktısı", "768×7×7", "row_attn[2]", "pool+norm[2]", 1536)]
+    for y, src, shp, ra, pn, dim in rows:
+        box(0.1, y, 3.0, 1.0, f"{src} ({shp})\nC: satır dikkati (eklenen)\n{prm(ra)} par.", NEW)
+        arr((3.1, y + 0.5), (3.7, y + 0.5))
+        box(3.7, y, 3.3, 1.0, f"B: ortalama + maks. havuz\n→ {dim}-d → LayerNorm\n{prm(pn)} par.", NEW)
+        arr((7.0, y + 0.5), (8.0, 3.2))
+    ax.text(0.1, 5.15, "Aşama 2, 3 ve 4 çıktıları üç dala ayrı ayrı beslenir (üstteki gövdeden):", fontsize=7.5, color=S.INK_2)
+    box(8.0, 2.4, 2.4, 1.6, f"Birleştir\n384+768+1536\n= 2688 boyutlu vektör\nDropout → Linear(2688→5)\n{prm('head (Linear)')} par.", STD)
+    arr((10.4, 3.2), (10.8, 3.2))
+    box(10.8, 2.7, 2.1, 1.0, "Çıktı: 5 sınıf\n(KL0–KL4)\nD: ordinal kayıp\n(yalnız eğitim)", NEW)
+    ax.text(0.1, 0.05, "Turuncu: bu çalışmada eklenen bileşenler (A, B, C, D). Mavi: hazır ağırlıklar / standart katmanlar.\nÇıktı boyutları kanal×yükseklik×genişlik.",
+            fontsize=7, color=S.INK_2, va="bottom")
+    _save(fig, "fig02_mimari", "Şekil 2. KneeOrdinalNet (özgün model) ayrıntılı blok şeması: stem ve dört aşamanın çıktı boyutları, aşama 2-4'ten çıkan satır dikkati (C) ve havuz (B) dalları, 2.688 boyutlu birleşik vektör ve sınıflandırma başı; her blokta parametre sayısı verilmiştir.")
 
 
 # ---------------------------------------------------------------- eğitim eğrileri
 def curves(names=("DeiTSmall__opt", "Orig_full__opt"), seed=C.SEED):
     fig, axes = plt.subplots(len(names), 2, figsize=(9, 3.2 * len(names)), squeeze=False)
+    xmax = max(len(pd.read_csv(RUNS / n / f"seed{seed}" / "history.csv")) for n in names) + 0.5   # tüm panellerde aynı epoch aralığı
     for r, n in enumerate(names):
         d = RUNS / n / f"seed{seed}"
         h = pd.read_csv(d / "history.csv"); meta = load_json(d / "meta.json")
@@ -103,10 +122,10 @@ def curves(names=("DeiTSmall__opt", "Orig_full__opt"), seed=C.SEED):
                 ax.axvline(last, color="#c0392b", lw=1, ls=":")
                 ax.text(last - 0.3, ax.get_ylim()[0], ("erken durdurma (ep. %d) " if early else "epoch bütçesi bitti (ep. %d) ") % last,
                         fontsize=7, ha="right", va="bottom", color="#c0392b")
-            ax.set_xlabel("Epoch"); ax.set_ylabel(lab); ax.set_title(NAME[n], fontsize=9)
+            ax.set_xlim(0.5, xmax); ax.set_xlabel("Epoch"); ax.set_ylabel(lab); ax.set_title(NAME[n], fontsize=9)
             if r == 0 and c == 0: ax.legend(fontsize=8)
     fig.tight_layout()
-    _save(fig, "fig03_egitim_egrileri", "Şekil 3. Eğitim ve doğrulama eğrileri (seed 42). Siyah noktalı çizgi en iyi epoch'u (geri yüklenen ağırlık), kırmızı çizgi eğitimin bittiği epoch'u gösterir; etiket, bitişin erken durdurma mı epoch bütçesi mi olduğunu belirtir.")
+    _save(fig, "fig03_egitim_egrileri", "Şekil 3. DeiT-Small ve özgün modelin eğitim/doğrulama kayıp ve doğruluk eğrileri (eğitim ve doğrulama kümeleri, seed 42; tüm panellerde aynı epoch aralığı). Siyah noktalı çizgi en iyi epoch'u (geri yüklenen ağırlık), kırmızı çizgi eğitimin bittiği epoch'u gösterir; etiket, bitişin erken durdurma mı epoch bütçesi mi olduğunu belirtir. Çıkarım: iki model de doğrulama doğruluğu platoya girdiğinde durur; farklı bitiş epoch'ları modellerin farklı sürede yakınsadığını gösterir.")
 
 
 # ---------------------------------------------------------------- karışıklık matrisleri
@@ -122,26 +141,37 @@ def confusions(names=("DeiTSmall__opt", "Orig_full__opt", "hybrid_mean4"), seed=
         ax.set_xticks(range(K), C.CLASS_NAMES); ax.set_yticks(range(K), C.CLASS_NAMES)
         ax.set_xlabel("Tahmin"); ax.set_ylabel("Gerçek"); ax.set_title(NAME[n], fontsize=9)
     fig.tight_layout()
-    _save(fig, "fig04_karisiklik_matrisleri", "Şekil 4. Test kümesinde satır bazında normalize karışıklık matrisleri (seed 42).")
+    _save(fig, "fig04_karisiklik_matrisleri", "Şekil 4. DeiT-Small, özgün model ve hibritin test kümesindeki satır bazında normalize karışıklık matrisleri (seed 42). Çıkarım: hatalar ağırlıkla komşu derecelerde toplanır; KL1 en çok KL0 ve KL2 ile karışır.")
 
 
 # ---------------------------------------------------------------- ROC / PR
 def roc_pr(names=("DeiTSmall__opt", "Orig_full__opt"), seed=C.SEED):
-    fig, axes = plt.subplots(1, 2, figsize=(9.5, 4))
+    from sklearn.metrics import auc, average_precision_score, roc_auc_score
+    fig, axes = plt.subplots(1, 2, figsize=(9.5, 4)); rows = []
+    grid = np.linspace(0, 1, 201); rgrid = np.linspace(0, 1, 201)
     for n in names:
-        p, y = _probs(n, seed)
+        p, y = _probs(n, seed); ls = "-" if n == "Orig_full__opt" else "--"
+        tprs, precs = [], []
         for k in range(K):
             t = (y == k).astype(int)
             f, tp, _ = roc_curve(t, p[:, k]); pr, rc, _ = precision_recall_curve(t, p[:, k])
-            ls = "-" if n == "Orig_full__opt" else "--"
-            axes[0].plot(f, tp, color=S.KL_COLORS[k], ls=ls, lw=1.4, label=f"{C.CLASS_NAMES[k]}" if n == names[0] else None)
-            axes[1].plot(rc, pr, color=S.KL_COLORS[k], ls=ls, lw=1.4)
+            axes[0].plot(f, tp, color=S.KL_COLORS[k], ls=ls, lw=1.0, alpha=.8, label=f"{C.CLASS_NAMES[k]}" if n == names[0] else None)
+            axes[1].plot(rc, pr, color=S.KL_COLORS[k], ls=ls, lw=1.0, alpha=.8)
+            tprs.append(np.interp(grid, f, tp)); precs.append(np.interp(rgrid, rc[::-1], pr[::-1]))
+        axes[0].plot(grid, np.mean(tprs, 0), color="black", ls=ls, lw=2.2)
+        axes[1].plot(rgrid, np.mean(precs, 0), color="black", ls=ls, lw=2.2)
+        yb = np.eye(K)[y]
+        fm, tm, _ = roc_curve(yb.ravel(), p.ravel())
+        rows.append({"model": n, "seed": seed, "macro_auc_ovr": roc_auc_score(y, p, multi_class="ovr", average="macro"),
+                     "micro_auc": auc(fm, tm), "macro_pr_auc": average_precision_score(yb, p, average="macro"),
+                     "micro_pr_auc": average_precision_score(yb, p, average="micro")})
+    pd.DataFrame(rows).to_csv(OUT / "roc_pr_summary.csv", index=False)
     axes[0].plot([0, 1], [0, 1], color=S.MUTED, lw=.8); axes[0].set_xlabel("Yanlış pozitif oranı"); axes[0].set_ylabel("Doğru pozitif oranı")
     axes[1].set_xlabel("Duyarlılık (recall)"); axes[1].set_ylabel("Kesinlik (precision)")
-    axes[0].legend(fontsize=7, title="Sınıf (çizgi: aşağıda)", title_fontsize=7)
+    axes[0].plot([], [], color="black", lw=2.2, label="Makro ortalama"); axes[0].legend(fontsize=7, title="Sınıf", title_fontsize=7)
     axes[1].plot([], [], "k-", label="Özgün model"); axes[1].plot([], [], "k--", label="DeiT-Small"); axes[1].legend(fontsize=8)
     fig.tight_layout()
-    _save(fig, "fig05_roc_pr", "Şekil 5. Sınıfa karşı diğerleri (bire-karşı) ROC ve PR eğrileri, test kümesi (seed 42). Düz çizgi: özgün model, kesikli: DeiT-Small.")
+    _save(fig, "fig05_roc_pr", "Şekil 5. Bire-karşı ROC (sol) ve kesinlik-duyarlılık (sağ) eğrileri, özgün model (düz) ve DeiT-Small (kesikli), test kümesi, seed 42; kalın siyah çizgi makro ortalamadır. Çıkarım: ara dereceler (KL1, KL2) uçlardan belirgin biçimde daha zor ayrılır; iki model makro düzeyde birbirine çok yakındır.")
 
 
 # ---------------------------------------------------------------- kalibrasyon
@@ -159,7 +189,7 @@ def reliability(names=("DeiTSmall__opt", "Orig_full__opt"), seed=C.SEED, bins=15
         ax.plot([0, 1], [0, 1], color=S.MUTED, lw=.8); ax.set_xlabel("Ortalama güven"); ax.set_title(NAME[n], fontsize=9)
     axes[0].set_ylabel("Doğruluk"); axes[0].legend(fontsize=8)
     fig.tight_layout()
-    _save(fig, "fig06_guvenilirlik", "Şekil 6. Güvenilirlik diyagramı (15 kutu, en az 5 örnekli kutular). Sıcaklık yalnızca doğrulamada öğrenildi.")
+    _save(fig, "fig06_guvenilirlik", "Şekil 6. DeiT-Small ve özgün modelin güvenilirlik diyagramları (test kümesi, seed 42; 15 kutu, en az 5 örnekli kutular). Sıcaklık yalnızca doğrulama kümesinde öğrenildi. Çıkarım: sıcaklık ölçekleme güveni köşegene yaklaştırır.")
 
 
 # ---------------------------------------------------------------- verimlilik
