@@ -180,6 +180,42 @@ def get_dataset_root() -> Path:
     return locate_dataset_root(C.EXTRACT_DIR)
 
 
+def ensure_data(url: str | None = None) -> Path:
+    """Notebook'ların tek veri çağrısı. Sırayla: (1) görüntüler oturum diskinde zaten açıksa hiçbir şey yapma;
+    (2) Drive'daki arşiv kopyası varsa onu oturum diskine kopyalayıp aç; (3) yoksa bağlantıdan indir, arşivi
+    Drive'a bir kez kaydet ve aç. Dosya listeleri (outputs/splits) yeniden üretilmez: bölme bir kez yapıldı."""
+    info_p = C.AUDIT_DIR / "download_info.json"
+    info = load_json(info_p) if info_p.exists() else {}
+    if C.EXTRACT_DIR.exists() and any(C.EXTRACT_DIR.rglob(C.DATASET_SUBDIR)):
+        return get_dataset_root()
+    C.ensure_dirs()
+    cached = C.ARCHIVE_CACHE / C.ARCHIVE_NAME
+    local = C.RAW_DIR / C.ARCHIVE_NAME
+    if cached.exists():
+        log.info("Arşiv Drive önbelleğinden kopyalanıyor (%.1f GB)...", cached.stat().st_size / 1e9)
+        shutil.copyfile(cached, local)
+        if info.get("archive_bytes") and local.stat().st_size != info["archive_bytes"]:
+            raise RuntimeError("Önbellekteki arşivin boyutu kayıtla uyuşmuyor; dosyayı silip yeniden indirin.")
+    else:
+        url = url or info.get("download_url")
+        if not url:
+            raise ValueError("Önbellekte arşiv yok ve indirme bağlantısı bilinmiyor: ensure_data(url=...) verin.")
+        download(url, local)
+        digest = sha256sum(local)
+        if info.get("sha256") and digest != info["sha256"]:
+            raise ValueError(f"SHA256 uyuşmuyor! kayıt={info['sha256']} bulunan={digest}")
+        try:
+            C.ARCHIVE_CACHE.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(local, cached)
+            log.info("Arşiv bir sonraki oturumlar için kaydedildi: %s", cached)
+        except OSError as e:
+            log.warning("Arşiv Drive'a kaydedilemedi (%s); bir sonraki oturumda yeniden indirilecek.", e)
+    if extract_target(local, C.EXTRACT_DIR) == 0:
+        raise RuntimeError("Arşivde kneeKL224 bulunamadı.")
+    local.unlink(missing_ok=True)   # oturum diskinde yer aç
+    return get_dataset_root()
+
+
 # --------------------------------------------------------------------------- ana akış
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="VS13 veri indirme ve hazırlama")
@@ -209,6 +245,12 @@ def main(argv=None) -> None:
         if args.expected_sha256 and digest.lower() != args.expected_sha256.lower():
             raise ValueError(f"SHA256 uyuşmuyor! beklenen={args.expected_sha256} bulunan={digest}")
         log.info("SHA256 = %s", digest)
+        try:   # sonraki oturumlar internetten değil buradan kopyalar
+            C.ARCHIVE_CACHE.mkdir(parents=True, exist_ok=True)
+            if not (C.ARCHIVE_CACHE / C.ARCHIVE_NAME).exists():
+                shutil.copyfile(zip_path, C.ARCHIVE_CACHE / C.ARCHIVE_NAME)
+        except OSError as e:
+            log.warning("Arşiv önbelleğe kaydedilemedi: %s", e)
         n = extract_target(zip_path, C.EXTRACT_DIR)
         if n == 0:
             raise RuntimeError("Arşivde kneeKL224 bulunamadı. Arşiv içeriğini kontrol edin.")

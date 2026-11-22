@@ -16,6 +16,10 @@ DATA_ROOT = Path(os.environ.get("KNEE_DATA_ROOT", "/content/data"))
 RAW_DIR = DATA_ROOT / "raw"            # indirilen arşiv
 EXTRACT_DIR = DATA_ROOT / "extracted"  # yalnızca kneeKL224 açılır
 
+# Ham ARŞİV (açılmamış zip) Drive'da bir kez saklanır; her oturumda yeniden indirmek yerine buradan kopyalanır.
+# Açılmış görüntüler Drive'a konmaz (ödev belgesi: büyük veri oturum diskinde tutulur).
+ARCHIVE_CACHE = Path(os.environ.get("KNEE_ARCHIVE_CACHE", "/content/drive/MyDrive/YZProje_cache"))
+
 OUTPUT_DIR = Path(os.environ.get("KNEE_OUTPUT_DIR", PROJECT_ROOT / "outputs"))
 SPLITS_DIR = OUTPUT_DIR / "splits"     # sabit dosya listeleri (tüm deneylerde aynı)
 AUDIT_DIR = OUTPUT_DIR / "audit"       # veri denetimi tabloları / json
