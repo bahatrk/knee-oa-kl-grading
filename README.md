@@ -42,8 +42,6 @@ YZProje/
 2. `notebooks/01_veri_hazirlik_ve_denetim.ipynb` dosyasını Colab'da açın.
 3. `DATA_URL` değişkenine VS13 indirme bağlantısını yapıştırıp tüm hücreleri çalıştırın.
 
-## Kaggle
-Colab kotası dolarsa bkz. `docs/KAGGLE_REHBERI.md` (notebook'lar iki platformda da çalışır).
 
 ## Komut satırı kullanımı
 ```bash
