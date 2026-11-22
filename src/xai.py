@@ -2,7 +2,7 @@
 
 Seçimler test kümesinde yeniden yapılır ama sabit seed ile: 20 doğru sınıflandırılmış (sınıf başına 4) ve
 12 yanlış sınıflandırılmış (özgün model hatası; önce uzak hatalar) örnek açıklanır.
-Doğrulama testleri: (1) parametre rastgeleleştirme (kademeli, çıktıdan girdiye), (2) silme eğrisi (deletion).
+Doğrulama testleri: (1) parametre rastgeleleştirme (kademeli, çıktıdan girdiye), (2) silme eğrisi (deletion; gerçek sınıfla), (3) kenar bandı atıf payı.
 Baseline ve silme dolgusu: görüntünün bulanıklaştırılmış hali (özgün model görüntü başına standardizasyon
 yaptığından sıfır/ölçekli baseline anlamsızdır: f(a·x) = f(x)).
 """
@@ -223,6 +223,71 @@ def grid_figure(items, name, caption):
 
 
 # ----------------------------------------------------------------------------- ana akış
+BORDER_W = 12                                       # kenar bandı genişliği (piksel)
+BORDER_AREA = 1 - ((SIZE - 2 * BORDER_W) / SIZE) ** 2   # bandın görüntü alanındaki payı (~%20)
+
+
+def border_mass(m):
+    """Haritadaki toplam atfın dış kenar bandına düşen payı (düzgün dağılımda BORDER_AREA)."""
+    m = np.clip(m.detach().cpu().numpy().astype(float), 0, None); m = m / (m.sum() + 1e-8)
+    return float(1 - m[BORDER_W:-BORDER_W, BORDER_W:-BORDER_W].sum())
+
+
+def deletion_and_border(mo, md, ds_o, ds_d, y, device, seed=C.SEED, n_per_class=12, caps=None):
+    """Silme eğrisi GERÇEK sınıfla (proje belgesi: doğru sınıfın olasılığındaki düşüş): hem haritalar gerçek sınıf
+    için üretilir hem de ölçülen olasılık gerçek sınıfındır. Dengeli n_per_class/sınıf. Ayrıca kenar-bandı payı."""
+    caps = {} if caps is None else caps
+    rng = np.random.default_rng(seed)
+    cur = np.concatenate([rng.choice(np.where(y == k)[0], n_per_class, replace=False) for k in range(C.NUM_CLASSES)])
+    fracs = [0, .05, .1, .2, .3, .4, .5, .6, .8, 1.0]
+    names = ("Özgün Grad-CAM", "Özgün IG", "Özgün rastgele", "DeiT Grad-CAM", "DeiT rollout", "DeiT IG", "DeiT rastgele")
+    res = {k: [] for k in names}; border = []
+    for i in cur:
+        c = int(y[i]); ct = torch.tensor([c], device=device)
+        xo = ds_o[i][0][None].to(device); xd = ds_d[i][0][None].to(device)
+        rr = torch.rand(SIZE, SIZE, device=device)
+        maps = {"Özgün Grad-CAM": (mo, xo, gradcam(mo, xo, ct, "original")[0]), "Özgün IG": (mo, xo, integrated_gradients(mo, xo, c)[0]),
+                "Özgün rastgele": (mo, xo, rr), "DeiT Grad-CAM": (md, xd, gradcam(md, xd, ct, "vit")[0]),
+                "DeiT rollout": (md, xd, attention_rollout(md, xd)[0]), "DeiT IG": (md, xd, integrated_gradients(md, xd, c)[0]),
+                "DeiT rastgele": (md, xd, rr)}
+        for k, (mod, x, m) in maps.items():
+            res[k].append(deletion_curve(mod, x, c, m, fracs))
+            border.append({"idx": int(i), "true": c, "method": k, "border_mass": border_mass(m)})
+    summ = []
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True)
+    for ax, mdl in zip(axes, ("Özgün", "DeiT")):
+        for k, v in res.items():
+            if not k.startswith(mdl): continue
+            v = np.array(v); mu = v.mean(0); auc = float(_trapz(mu, fracs))
+            summ.append({"yöntem": k, "deletion_AUC_düşük_iyi": auc, "p_gercek_sinif_baslangic": float(mu[0]), "n_görüntü": len(v)})
+            ax.plot(np.array(fracs) * 100, mu, label=f"{k} (AUC {auc:.3f})", ls=":" if "rastgele" in k else "-")
+        ax.set_xlabel("Silinen piksel oranı (%)"); ax.set_title(mdl, fontsize=9); ax.legend(fontsize=7)
+    axes[0].set_ylabel("Gerçek sınıfın olasılığı")
+    fig.tight_layout(); S.save_fig(fig, C.FIG_DIR / "fig10_silme_egrisi.png")
+    caps["fig10_silme_egrisi"] = "Şekil 10. Silme eğrileri (60 dengeli test görüntüsü): önemli pikseller önce bulanıklaştırılır; hızlı düşüş = açıklama modelin kullandığı bölgeyi yakalıyor."
+    pd.DataFrame(summ).to_csv(XAI / "deletion_auc.csv", index=False)
+    pd.DataFrame({k: np.array(v).mean(0) for k, v in res.items()}, index=fracs).to_csv(XAI / "deletion_curves.csv")
+    bd = pd.DataFrame(border); bd.to_csv(XAI / "border_mass.csv", index=False)
+    bs = bd.groupby("method").border_mass.agg(["mean", "std"]).reset_index()
+    bs["uniform_expected"] = BORDER_AREA; bs["ratio_to_uniform"] = bs["mean"] / BORDER_AREA
+    bs.to_csv(XAI / "border_mass_summary.csv", index=False)
+    return cur
+
+
+def run_deletion(device=None, seed=C.SEED, n_curve_per_class=12):
+    """Yalnızca silme eğrisi + kenar bandı (rastgeleleştirme ve örnek ızgaraları yeniden üretilmez; ~5-10 dk)."""
+    S.apply_style(); XAI.mkdir(parents=True, exist_ok=True)
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    mo, meta_o = load_model(ORIG, seed, device); md, meta_d = load_model(DEIT, seed, device)
+    _, y = _test(ORIG, seed)
+    caps = {}
+    deletion_and_border(mo, md, test_dataset(meta_o), test_dataset(meta_d), y, device, seed, n_curve_per_class, caps)
+    cp = C.FIG_DIR / "captions.json"
+    old = json.loads(cp.read_text(encoding="utf-8")) if cp.exists() else {}
+    old.update(caps); cp.write_text(json.dumps(old, ensure_ascii=False, indent=2), encoding="utf-8")
+    return pd.read_csv(XAI / "deletion_auc.csv"), pd.read_csv(XAI / "border_mass_summary.csv")
+
+
 def run(device=None, seed=C.SEED, n_curve_per_class=12):
     S.apply_style(); XAI.mkdir(parents=True, exist_ok=True)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -258,37 +323,7 @@ def run(device=None, seed=C.SEED, n_curve_per_class=12):
         if items:
             k, v = grid_figure(items, nm, cap); caps[k] = v
 
-    # silme eğrisi: dengeli 12/sınıf, tahmin edilen sınıf
-    rng = np.random.default_rng(seed)
-    cur = np.concatenate([rng.choice(np.where(y == k)[0], n_curve_per_class, replace=False) for k in range(C.NUM_CLASSES)])
-    fracs = [0, .05, .1, .2, .3, .4, .5, .6, .8, 1.0]
-    res = {k: [] for k in ("Özgün Grad-CAM", "Özgün IG", "Özgün rastgele", "DeiT Grad-CAM", "DeiT rollout", "DeiT IG", "DeiT rastgele")}
-    for i in cur:
-        xo = ds_o[i][0][None].to(device); xd = ds_d[i][0][None].to(device)
-        co, cd = int(po[i].argmax()), int(pdp[i].argmax())
-        rr = torch.rand(SIZE, SIZE, device=device)
-        res["Özgün Grad-CAM"].append(deletion_curve(mo, xo, co, gradcam(mo, xo, torch.tensor([co], device=device), "original")[0], fracs))
-        res["Özgün IG"].append(deletion_curve(mo, xo, co, integrated_gradients(mo, xo, co)[0], fracs))
-        res["Özgün rastgele"].append(deletion_curve(mo, xo, co, rr, fracs))
-        res["DeiT Grad-CAM"].append(deletion_curve(md, xd, cd, gradcam(md, xd, torch.tensor([cd], device=device), "vit")[0], fracs))
-        res["DeiT rollout"].append(deletion_curve(md, xd, cd, attention_rollout(md, xd)[0], fracs))
-        res["DeiT IG"].append(deletion_curve(md, xd, cd, integrated_gradients(md, xd, cd)[0], fracs))
-        res["DeiT rastgele"].append(deletion_curve(md, xd, cd, rr, fracs))
-    summ = []
-    fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True)
-    for ax, mdl in zip(axes, ("Özgün", "DeiT")):
-        for k, v in res.items():
-            if not k.startswith(mdl): continue
-            v = np.array(v); mu = v.mean(0)
-            auc = float(_trapz(mu, fracs))
-            summ.append({"yöntem": k, "deletion_AUC_düşük_iyi": auc, "n_görüntü": len(v)})
-            ax.plot(np.array(fracs) * 100, mu, label=f"{k} (AUC {auc:.3f})", ls=":" if "rastgele" in k else "-")
-        ax.set_xlabel("Silinen piksel oranı (%)"); ax.set_title(mdl, fontsize=9); ax.legend(fontsize=7)
-    axes[0].set_ylabel("Tahmin edilen sınıfın olasılığı")
-    fig.tight_layout(); S.save_fig(fig, C.FIG_DIR / "fig10_silme_egrisi.png")
-    caps["fig10_silme_egrisi"] = "Şekil 10. Silme eğrileri (60 dengeli test görüntüsü): önemli pikseller önce bulanıklaştırılır; hızlı düşüş = açıklama modelin kullandığı bölgeyi yakalıyor."
-    pd.DataFrame(summ).to_csv(XAI / "deletion_auc.csv", index=False)
-    pd.DataFrame({k: np.array(v).mean(0) for k, v in res.items()}, index=fracs).to_csv(XAI / "deletion_curves.csv")
+    cur = deletion_and_border(mo, md, ds_o, ds_d, y, device, seed, n_curve_per_class, caps)
 
     # rastgeleleştirme testi (her model için 20 görüntü; tahmin edilen sınıf)
     sub = cur[::3][:20]

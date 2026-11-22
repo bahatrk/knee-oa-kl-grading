@@ -92,6 +92,7 @@ _PAIRS = {
     " rastgele": " random",
     "Silinen piksel oranı (%)": "Fraction of pixels deleted (%)",
     "Tahmin edilen sınıfın olasılığı": "Probability of predicted class",
+    "Gerçek sınıfın olasılığı": "Probability of the true class",
     "Kademeli rastgeleleştirilen katman grubu sayısı (çıktıdan girdiye)": "Layer groups randomized cumulatively (output to input)",
     "Spearman benzerliği (Grad-CAM)": "Spearman similarity (Grad-CAM)",
     # zorlu görevler
