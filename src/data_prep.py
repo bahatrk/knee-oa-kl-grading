@@ -194,16 +194,15 @@ def ensure_data(url: str | None = None) -> Path:
     if cached.exists():
         log.info("Arşiv Drive önbelleğinden kopyalanıyor (%.1f GB)...", cached.stat().st_size / 1e9)
         shutil.copyfile(cached, local)
-        if info.get("archive_bytes") and local.stat().st_size != info["archive_bytes"]:
+        if local.stat().st_size != (info.get("archive_bytes") or C.ARCHIVE_BYTES):
             raise RuntimeError("Önbellekteki arşivin boyutu kayıtla uyuşmuyor; dosyayı silip yeniden indirin.")
     else:
-        url = url or info.get("download_url")
-        if not url:
-            raise ValueError("Önbellekte arşiv yok ve indirme bağlantısı bilinmiyor: ensure_data(url=...) verin.")
+        url = url or info.get("download_url") or C.DATASET_URL
         download(url, local)
         digest = sha256sum(local)
-        if info.get("sha256") and digest != info["sha256"]:
-            raise ValueError(f"SHA256 uyuşmuyor! kayıt={info['sha256']} bulunan={digest}")
+        expected = info.get("sha256") or C.ARCHIVE_SHA256
+        if digest != expected:
+            raise ValueError(f"SHA256 uyuşmuyor! beklenen={expected} bulunan={digest}")
         try:
             C.ARCHIVE_CACHE.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(local, cached)

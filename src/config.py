@@ -35,6 +35,10 @@ DATASET_DOI = "10.17632/56rmx5bjcr.1"
 DATASET_LICENSE = "CC BY 4.0"
 DATASET_SUBDIR = "kneeKL224"           # proje belgesine göre yalnızca bu klasör kullanılır
 ARCHIVE_NAME = "KneeXrayData.zip"
+# Herkese açık indirme bağlantısı ve arşivin kayıtlı özeti (README ile aynı; temiz bir ortamda indirme için)
+DATASET_URL = "https://data.mendeley.com/public-files/datasets/56rmx5bjcr/files/205a9a5d-5de5-4f06-8f63-e430ed23ca44/file_downloaded"
+ARCHIVE_SHA256 = "3b4b93b3a3e2e2f059684f5d2b8bbd05aa7776d0199365fc6db51b93dc667505"
+ARCHIVE_BYTES = 7171571746
 
 NUM_CLASSES = 5
 CLASS_NAMES = ["KL0", "KL1", "KL2", "KL3", "KL4"]
