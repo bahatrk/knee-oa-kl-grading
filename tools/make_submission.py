@@ -16,6 +16,12 @@ def main(project: Path, out: Path):
     for d in ("src", "notebooks", "tools", "docs"):
         if (project / d).exists():
             shutil.copytree(project / d, dst / d, ignore=ig)
+    mn = project / "notebooks" / f"{NAME}.ipynb"
+    if mn.exists():
+        shutil.copy(mn, dst / mn.name)
+        shutil.rmtree(dst / "notebooks", ignore_errors=True)
+        shutil.copytree(project / "notebooks", dst / "notebooks" / "asamalar", ignore=shutil.ignore_patterns(
+            "__pycache__", ".ipynb_checkpoints", mn.name))
     for f in ("predict.py", "requirements.txt", "README.md"):
         shutil.copy(project / f, dst / f)
     # deploy: yalnızca fp16 + meta
@@ -44,11 +50,14 @@ def main(project: Path, out: Path):
     # rapor varsa
     for rep in (project / "report").glob("YZProje_Rapor*") if (project / "report").exists() else []:
         shutil.copy(rep, dst / rep.name)
-    # download_url gizli bilgi içerebilir -> teslimden çıkar
-    di = dst / "outputs" / "audit" / "download_info.json"
-    if di.exists():
-        d = json.loads(di.read_text(encoding="utf-8")); d.pop("download_url", None)
-        di.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+    # zorunlu dosyalar var mı? (eksik olanlar uyarı olarak yazılır)
+    need = ["README.md", "requirements.txt", "predict.py", "results.csv", "deploy/model_fp16.pt", "deploy/meta.json",
+            f"{NAME}.ipynb", "src/config.py"]
+    missing = [f for f in need if not (dst / f).exists()]
+    if not list(dst.glob("*.docx")) or not list(dst.glob("*.pdf")):
+        missing.append("rapor .docx/.pdf (Drive'da report/ klasörüne YZProje_Rapor_220709071.docx/.pdf koyun)")
+    if missing:
+        print("UYARI - eksik:", missing)
     z = out / f"{NAME}.zip"
     with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
         for p in sorted(dst.rglob("*")):
