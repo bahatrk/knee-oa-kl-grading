@@ -373,6 +373,9 @@ const appendix = [
   TBL([2200, 1100, 1100, 1100, 1200, 1200, 1172], [["Model", "Weighted F1", "QWK", "MAE", "Adjacent err.", "Distant err.", "PR AUC"], ...data.extra], { size: 17 }),
   GAP(),
   ...FIG("f_conf_all.png", 6.3, "Figure A1", "Row-normalized test confusion matrices of all neural networks, seed 42 (true grade in rows)."),
+  P(`Figures A2 and A3 show the training curves of the twelve networks of the main comparison (seed 42; tuned settings where a search was run). The thin vertical line marks the change from the head-training to the fine-tuning stage for pretrained networks, and the dotted line marks the epoch with the best validation macro F1 that was kept.`),
+  ...FIG("f_app_loss.png", 6.0, "Figure A2", "Training and validation loss per epoch of the twelve networks, seed 42; dotted line: selected epoch."),
+  ...FIG("f_app_f1.png", 6.0, "Figure A3", "Validation macro F1 per epoch of the twelve networks, seed 42; dotted line: selected epoch."),
   H1("Appendix E. Generative AI use statement"),
   P(`Generative AI (the assistant Claude, from Anthropic) was used throughout this project as a coding and writing assistant: to write and debug the Python code for the data audit, training, hyperparameter search, evaluation, statistics, explainability and figures; to prepare the Colab notebooks; to compute and format the results tables from the experiment outputs; and to draft and edit the English text of this report. The experiments were executed by the student on Google Colab, and all numbers in this report come from these runs. The student reviewed the code, results and text and is responsible for all content. The literature was located with web search and the bibliographic details of cited works were checked against publisher or repository pages; studies for which results could not be verified are cited without numbers.`),
 ];
